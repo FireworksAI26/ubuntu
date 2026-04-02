@@ -1,23 +1,20 @@
 #!/bin/bash
 
-# 1. Clear old locks
+echo "==> Clearing old locks..."
 rm -rf /tmp/.X1-lock /tmp/.X11-unix/X1 /var/run/dbus/pid
 
-# 2. Generate machine-id for dbus
+echo "==> Setting up dbus..."
 mkdir -p /var/lib/dbus
 dbus-uuidgen > /var/lib/dbus/machine-id
-
-# 3. Start system dbus
 mkdir -p /var/run/dbus
 dbus-daemon --system --fork || true
+sleep 1
 
-# 4. Start Xvfb (virtual framebuffer — lets GNOME actually render)
-echo "Starting Xvfb..."
+echo "==> Starting Xvfb..."
 Xvfb :1 -screen 0 1920x1080x24 &
-sleep 2
+sleep 3
 
-# 5. Start GNOME as remoteuser
-echo "Starting GNOME session..."
+echo "==> Starting GNOME as remoteuser..."
 sudo -u remoteuser env \
     DISPLAY=:1 \
     XDG_CURRENT_DESKTOP=GNOME \
@@ -26,24 +23,21 @@ sudo -u remoteuser env \
     XDG_SESSION_TYPE=x11 \
     GDK_BACKEND=x11 \
     dbus-launch --exit-with-session gnome-session &
-sleep 5
+sleep 8
 
-# 6. Start x11vnc (connects to the Xvfb display, not TigerVNC)
-echo "Starting x11vnc..."
-x11vnc -display :1 -nopw -listen localhost -xkb -ncache 10 -ncache_cr -forever &
+echo "==> Starting x11vnc..."
+x11vnc -display :1 -nopw -listen 0.0.0.0 -xkb -forever -shared -bg -o /var/log/x11vnc.log
 sleep 2
 
-# 7. Start noVNC
-echo "Starting noVNC on port 6080..."
-websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
+echo "==> Starting noVNC on port 6080..."
+websockify --web=/usr/share/novnc/ 0.0.0.0:6080 localhost:5900 &
 
 echo ""
 echo "========================================="
 echo "  GNOME Desktop ready!"
 echo "  Open port 6080 in RunPod to connect."
-echo "  No password required."
 echo "========================================="
 echo ""
 
-# 8. Keep alive
-wait
+# Keep alive and show x11vnc log
+tail -f /var/log/x11vnc.log
