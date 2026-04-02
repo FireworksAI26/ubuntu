@@ -1,22 +1,20 @@
 #!/bin/bash
 
-# Remove existing VNC locks
-rm -rf /tmp/.X1-lock /tmp/.X11-unix/X1
+# 1. Housekeeping: Clear old locks
+rm -rf /tmp/.X1-lock /tmp/.X11-unix/X1 /var/run/dbus/pid
 
-# Ensure D-Bus is running (Required for GNOME)
+# 2. Critical: Generate machine-id for GNOME/D-Bus
+dbus-uuidgen > /var/lib/dbus/machine-id
 mkdir -p /var/run/dbus
 dbus-daemon --system --fork
 
-# Start VNC server as the user
-# We use -localhost no to allow the websockify proxy to connect
+# 3. Start VNC as the user
+# We use -localhost no so the websockify bridge can reach it
 sudo -u remoteuser vncserver :1 -geometry 1920x1080 -depth 24 -localhost no
 
-# Start websockify to bridge VNC (5901) to the web port (6080)
-echo "Starting noVNC at http://localhost:6080"
+# 4. Start noVNC proxy
+echo "Launching noVNC on port 6080..."
 websockify --web=/usr/share/novnc/ 6080 localhost:5901 &
 
-# Prevent the container from exiting
-tail -f /dev/null
-
-# Keep container alive
-sleep infinity
+# 5. Keep the container alive and log output
+tail -f /home/remoteuser/.vnc/*.log
